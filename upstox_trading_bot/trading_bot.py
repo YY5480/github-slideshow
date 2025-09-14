@@ -26,6 +26,7 @@ INSTRUMENT_KEY = "NSE_EQ|INE669E01016" # Example: ITC
 TRADE_QUANTITY = 1
 ATR_PERIOD = 10
 ATR_MULTIPLIER = 1.0 # This is the 'a' value from your UT Bot script
+LINREG_LENGTH = 11   # Linear Regression Length
 
 # --- AUTHENTICATION & SERVER ---
 auth_code = None
@@ -119,9 +120,9 @@ class UpstoxTrader:
             # Fetch for the last ~30 days to ensure enough data for indicators
             api_response = api_instance.get_historical_candle_data1(
                 instrument_key=INSTRUMENT_KEY,
-                interval='1minute',
+                interval='1day',
                 to_date=time.strftime('%Y-%m-%d'),
-                from_date=(pd.to_datetime(time.strftime('%Y-%m-%d')) - pd.DateOffset(days=30)).strftime('%Y-%m-%d')
+                from_date=(pd.to_datetime(time.strftime('%Y-%m-%d')) - pd.DateOffset(years=1)).strftime('%Y-%m-%d')
             )
 
             candles = api_response.data.candles
@@ -186,7 +187,7 @@ class UpstoxTrader:
     def _on_message(self, ws, message):
         """Called on receipt of a new message from the WebSocket."""
         if self.is_processing:
-            return # Skip if already processing a tick
+            return  # Skip if already processing a tick
 
         self.is_processing = True
         try:
@@ -195,31 +196,30 @@ class UpstoxTrader:
                 for instrument, feed in decoded_data.feeds.items():
                     ltp = feed.ltpc.ltp
 
-                    # NOTE: This is a simplified tick processing. For a real bot,
-                    # you'd aggregate ticks into candles (e.g., 1-minute) before calculating.
-                    # For this example, we'll pretend each tick is a new candle's close.
-
-                    # Create a new row for the DataFrame
-                    new_row = pd.DataFrame([{
-                        'open': ltp, 'high': ltp, 'low': ltp, 'close': ltp,
-                        'timestamp': pd.to_datetime('now', utc=True)
-                    }]).set_index('timestamp')
-
-                    # Append new data and recalculate
-                    self.historical_data = pd.concat([self.historical_data, new_row])
+                    # Update the last row of our daily data with the live price
+                    # This simulates how the indicator would look on a live daily chart
+                    temp_df = self.historical_data.copy()
+                    temp_df.loc[temp_df.index[-1], 'close'] = ltp
 
                     last_position = self.position
-                    self.calculate_indicators(self.historical_data)
+                    self.calculate_indicators(temp_df)
                     new_position = self.position
 
-                    # Check for a signal change
+                    # Get the latest calculated values for the LinReg candle
+                    latest_bopen = self.historical_data['bopen'].iloc[-1]
+                    latest_bclose = self.historical_data['bclose'].iloc[-1]
+
+                    # --- MERGED TRADING LOGIC ---
                     if new_position != last_position:
-                        if new_position == 1:
-                            print("\n--- BUY SIGNAL DETECTED ---")
+                        if new_position == 1 and latest_bclose > latest_bopen:
+                            print("\n--- BUY SIGNAL DETECTED (UT Bot Buy + Green LinReg Candle) ---")
                             self.place_order(transaction_type=order_api.TransactionType.BUY)
-                        elif new_position == -1:
-                            print("\n--- SELL SIGNAL DETECTED ---")
+                        elif new_position == -1 and latest_bclose < latest_bopen:
+                            print("\n--- SELL SIGNAL DETECTED (UT Bot Sell + Red LinReg Candle) ---")
                             self.place_order(transaction_type=order_api.TransactionType.SELL)
+                        else:
+                            print(f"\nSignal ignored. UT Bot: {new_position}, LinReg Candle: {'Green' if latest_bclose > latest_bopen else 'Red'}")
+
         except Exception as e:
             print(f"Error processing message: {e}")
         finally:
@@ -263,13 +263,19 @@ class UpstoxTrader:
 
     def calculate_indicators(self, df):
         """
-        Translates the UT Bot Pine Script logic to Python.
-        Calculates ATR, the ATR Trailing Stop, and the position signal.
+        Merges the LinReg and UT Bot logic.
+        1. Calculates Linear Regression values for candles.
+        2. Calculates ATR.
+        3. Uses the smoothed LinReg close price as the source for the ATR Trailing Stop.
         """
         if df.empty:
             return
 
-        # Calculate ATR using pandas-ta
+        # Calculate Linear Regression values
+        df['bopen'] = ta.linreg(df['open'], length=LINREG_LENGTH)
+        df['bclose'] = ta.linreg(df['close'], length=LINREG_LENGTH)
+
+        # Calculate ATR on the raw prices
         df['atr'] = ta.atr(df['high'], df['low'], df['close'], length=ATR_PERIOD)
 
         # Drop rows with NaN values that result from indicator calculations
@@ -280,13 +286,13 @@ class UpstoxTrader:
         def nz(value, default=0.0):
             return default if pd.isna(value) else value
 
-        # Iteratively calculate ATR Trailing Stop
+        # Iteratively calculate ATR Trailing Stop using the smoothed close ('bclose')
         atr_trailing_stop = [0.0] * len(df)
         position = [0] * len(df)
 
         for i in range(1, len(df)):
-            src = df['close'].iloc[i]
-            src_prev = df['close'].iloc[i-1]
+            src = df['bclose'].iloc[i]
+            src_prev = df['bclose'].iloc[i-1]
             n_loss = ATR_MULTIPLIER * df['atr'].iloc[i]
 
             stop_prev = atr_trailing_stop[i-1]
