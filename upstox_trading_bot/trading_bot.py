@@ -24,8 +24,8 @@ REDIRECT_URI = "http://127.0.0.1:8000/callback" # Must match the one in your Ups
 # You can find this using the Upstox API or from their instrument master list
 INSTRUMENT_KEY = "NSE_EQ|INE669E01016" # Example: ITC
 TRADE_QUANTITY = 1
-ATR_PERIOD = 10
-ATR_MULTIPLIER = 1.0 # This is the 'a' value from your UT Bot script
+ATR_PERIOD = 1
+ATR_MULTIPLIER = 2.0 # This is the 'a' value from your UT Bot script
 LINREG_LENGTH = 11   # Linear Regression Length
 
 # --- AUTHENTICATION & SERVER ---
