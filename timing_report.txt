@@ -1,0 +1,28 @@
+Startpoint: ffa (rising edge-triggered flip-flop clocked by CLK)
+Endpoint: ffd (rising edge-triggered flip-flop clocked by CLK)
+Path Group: CLK
+Path Type: max
+-------------------------------------------------------------------
+Point                           Cap      Trans     Incr      Path
+-------------------------------------------------------------------
+clock CLK (rise edge)                                        0.00
+clock network delay (ideal)                                  0.00
+ffa/CLK (DTC10)                                   0.00      0.00 r
+ffa/Q (DTC10)                   3.85     0.57      1.70      1.70 f
+U7/Y (IV110)                    6.59     1.32      0.84      2.55 r
+U12/Y (NA310)                   8.87     2.47      2.04      4.58 f
+U17/Y (NA211)                   4.87     1.01      1.35      5.94 f
+ffd/D (DTN10)                            0.46      0.00      9.15 r
+data arrival time                                            9.15
+-------------------------------------------------------------------
+clock CLK (rise edge)                                       10.00
+clock network delay (ideal)                                  0.00
+ffd/CLK (DTN10)                                             10.00 r
+library setup time                       -1.33                 8.67
+data required time                                           8.67
+-------------------------------------------------------------------
+data required time                                           8.67
+data arrival time                                           -9.15
+-------------------------------------------------------------------
+slack (VIOLATED)                                            -0.48
+-------------------------------------------------------------------
