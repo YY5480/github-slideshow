@@ -1,0 +1,36 @@
+
+# cdc_synchronizer.upf
+#
+# A conceptual UPF file for our cdc_synchronizer module.
+# This demonstrates how to define power domains and map them to the RTL.
+
+# --- Power Domain Definitions ---
+
+# Create the primary power domain, which is typically the top-level
+# of the design. We'll call it PD_TOP.
+create_power_domain PD_TOP
+
+# Create a power domain for the logic running on the fast clock.
+# We will define its scope to be within PD_TOP.
+create_power_domain PD_FAST -elements { rst_fast data_in_fast }
+
+# Create a power domain for the logic running on the slow clock.
+# This will contain our synchronizer flip-flops.
+create_power_domain PD_SLOW -elements { sync_ff1 sync_ff2 data_out_slow }
+
+# In a real design, you would also define the power supplies,
+# power switches, and isolation rules between these domains.
+# For simplicity, we are only showing the domain creation and
+# mapping of RTL elements.
+
+# --- Example of advanced UPF commands (for illustration) ---
+
+# set_domain_supply_net PD_FAST -primary_power_net VDD_FAST -primary_ground_net VSS
+# set_domain_supply_net PD_SLOW -primary_power_net VDD_SLOW -primary_ground_net VSS
+
+# create_isolation_rule -name iso_rule_fast_to_slow -from PD_FAST -to PD_SLOW -clamp_value 0
+# create_level_shifter_rule -name ls_rule_slow_to_fast -from PD_SLOW -to PD_FAST
+
+# The `-elements` option in `create_power_domain` is a simple way to
+# map logic. A more common method for larger designs is to use a separate
+# `map_power_domain` command with more complex rules.
